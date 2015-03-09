@@ -23,4 +23,12 @@ public class Stop {
     public String getStopId() {
         return stopId;
     }
+
+    public float getLat() {
+        return lat;
+    }
+
+    public float getLon() {
+        return lon;
+    }
 }

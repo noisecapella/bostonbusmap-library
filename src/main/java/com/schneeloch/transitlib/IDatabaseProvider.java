@@ -10,5 +10,5 @@ import java.util.concurrent.Future;
  * Created by george on 3/1/15.
  */
 public interface IDatabaseProvider {
-    Future<List<Stop>> readStops(List<String> toRead) throws SQLiteException, ExecutionException, InterruptedException;
+    Future<List<Stop>> readStops(List<String> toRead) throws Throwable;
 }

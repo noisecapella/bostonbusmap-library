@@ -1,7 +1,14 @@
 package com.schneeloch.transitlib;
 
+import java.io.IOException;
+
 /**
- * Created by george on 3/7/15.
+ * Quite frankly, there's no good way to do long term serialization on Android
+ * @author schneg
+ *
  */
-public class CanBeSerialized {
+public interface CanBeSerialized {
+    void serialize(IBox blob) throws IOException;
+
+    //implement a constructor taking Box
 }
