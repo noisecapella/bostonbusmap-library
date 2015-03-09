@@ -12,10 +12,10 @@ import java.util.concurrent.Future;
 /**
  * Created by george on 3/1/15.
  */
-public class StopCache {
+public class TransitCache {
     private final ConcurrentHashMap<String, Stop> stops;
 
-    public StopCache() {
+    public TransitCache() {
         stops = new ConcurrentHashMap<>();
     }
 
