@@ -8,14 +8,13 @@ import java.io.IOException;
 public class Route {
     private final String route;
     private final String routeTitle;
-    private final Path path;
+    private final int sourceId;
 
-    public Route(String route, String routeTitle, int color, byte[] blob) throws IOException {
+    public Route(String route, String routeTitle, int sourceId) throws IOException {
 
         this.route = route;
         this.routeTitle = routeTitle;
-        Box box = new Box(blob, 1);
-        this.path = new Path(box, color);
+        this.sourceId = sourceId;
     }
 
     public String getRouteTitle() {
@@ -26,7 +25,7 @@ public class Route {
         return route;
     }
 
-    public Path getPath() {
-        return path;
+    public Integer getSourceId() {
+        return sourceId;
     }
 }

@@ -4,6 +4,7 @@ import com.almworks.sqlite4java.*;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.JdkFutureAdapters;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.schneeloch.transitlib.Geometry;
@@ -14,6 +15,7 @@ import com.schneeloch.transitlib.Stop;
 import java.io.File;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 
 /**
@@ -44,7 +46,7 @@ public class DatabaseProvider implements IDatabaseProvider {
         public T apply(SQLiteConnection connection) throws Throwable;
     }
 
-    protected <T> ListenableFuture<T> executeJob(final CustomJob<T> job) throws Throwable {
+    protected <T> ListenableFuture<T> executeJob(final CustomJob<T> job) throws Exception {
         final CopyOnWriteArrayList<RunnableExecutorPair> listeners = new CopyOnWriteArrayList<>();
         final SQLiteJob<T> extendedJob = new SQLiteJob<T>() {
             @Override
@@ -71,19 +73,37 @@ public class DatabaseProvider implements IDatabaseProvider {
         return executeJob(new CustomJob<List<Stop>>() {
             @Override
             public List<Stop> apply(SQLiteConnection connection) throws Throwable {
-                SQLiteStatement statement = connection.prepare("SELECT tag, lat, lon, title from stops where tag IN (" + Joiner.on(',').join(parameters) + ")");
+                SQLiteStatement statement = connection.prepare("SELECT s.tag, s.lat, s.lon, s.title, sm.route " +
+                        "FROM stops AS s " +
+                        "JOIN stopmapping AS sm ON s.tag = sm.tag WHERE s.tag IN (" + Joiner.on(',').join(parameters) + ")");
                 try {
                     for (int i = 0; i < parameters.length; i++) {
                         statement.bind(i + 1, toRead.get(i));
                     }
-                    List<Stop> ret = Lists.newArrayList();
+                    Map<String, Stop.Builder> map = Maps.newHashMap();
                     while (statement.step()) {
                         String stopId = statement.columnString(0);
                         float lat = (float) statement.columnDouble(1);
                         float lon = (float) statement.columnDouble(2);
                         String title = statement.columnString(3);
+                        String routeId = statement.columnString(4);
 
-                        Stop stop = new Stop(stopId, title, lat, lon);
+                        if (map.containsKey(stopId)) {
+                            map.get(stopId).addRouteId(routeId);
+                        }
+                        else {
+                            Stop.Builder builder = new Stop.Builder()
+                                    .stopId(stopId)
+                                    .stopTitle(title)
+                                    .lat(lat)
+                                    .lon(lon)
+                                    .addRouteId(routeId);
+                            map.put(stopId, builder);
+                        }
+                    }
+                    List<Stop> ret = Lists.newArrayList();
+                    for (String stopId : toRead) {
+                        Stop stop = map.get(stopId).build();
                         ret.add(stop);
                     }
                     return ret;
@@ -119,7 +139,7 @@ public class DatabaseProvider implements IDatabaseProvider {
         });
     }
 
-    public ListenableFuture<List<Route>> getRoutesBySourceId(final List<Integer> sourceIds) throws Throwable {
+    public ListenableFuture<List<Route>> getRoutesBySourceId(final Collection<Integer> sourceIds) throws Exception {
         String[] questionMarks = new String[sourceIds.size()];
         for (int i = 0; i < questionMarks.length; i++) {
             questionMarks[i] = "?";
@@ -128,23 +148,24 @@ public class DatabaseProvider implements IDatabaseProvider {
             throw new RuntimeException("No sourceIds specified");
         }
 
-        final String sql = "SELECT route, routetitle, color, pathblob FROM routes where agencyid IN (" + Joiner.on(", ").join(questionMarks) + ") order by listorder ASC ";
+        final String sql = "SELECT route, routetitle, agencyid FROM routes where agencyid IN (" + Joiner.on(", ").join(questionMarks) + ") order by listorder ASC ";
         return executeJob(new CustomJob<List<Route>>() {
 
             @Override
             public List<Route> apply(SQLiteConnection connection) throws Throwable {
                 SQLiteStatement statement = connection.prepare(sql);
-                for (int i = 0; i < sourceIds.size(); i++) {
-                    statement.bind(i+1, sourceIds.get(i));
+                int i = 0;
+                for (int sourceId : sourceIds) {
+                    statement.bind(i+1, sourceId);
+                    i++;
                 }
                 try {
                     List<Route> ret = Lists.newArrayList();
                     while (statement.step()) {
                         String route = statement.columnString(0);
                         String routeTitle = statement.columnString(1);
-                        int color = statement.columnInt(2);
-                        byte[] blob = statement.columnBlob(3);
-                        ret.add(new Route(route, routeTitle, color, blob));
+                        int sourceId = statement.columnInt(2);
+                        ret.add(new Route(route, routeTitle, sourceId));
                     }
                     return ret;
                 } finally {
