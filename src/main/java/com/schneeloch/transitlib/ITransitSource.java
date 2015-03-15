@@ -15,13 +15,13 @@ import java.util.concurrent.ExecutorService;
  * Created by george on 3/1/15.
  */
 public interface ITransitSource {
-    ListenableFuture<List<Stop>> readStops(DatabaseProvider provider, TransitCache transitCache, List<String> toRead) throws Throwable;
+    List<Stop> readStops(DatabaseProvider provider, TransitCache transitCache, List<String> toRead) throws Exception;
 
-    ListenableFuture<List<Stop>> getStopsNear(DatabaseProvider provider, TransitCache transitCache, float lat, float lon) throws Throwable;
+    List<Stop> getStopsNear(DatabaseProvider provider, TransitCache transitCache, float lat, float lon) throws Exception;
 
-    ListenableFuture<ImmutableTable<String, Integer, Route>> getRoutes(DatabaseProvider provider, TransitCache transitCache) throws Throwable;
+    ImmutableTable<String, Integer, Route> getRoutes(DatabaseProvider provider, TransitCache transitCache) throws Exception;
 
-    ListenableFuture<Map<String, ImmutableList<IPrediction>>> getPredictionsByStop(TransitCache transitCache, IDownloader downloader, ExecutorService executorService, DatabaseProvider provider, List<Stop> stops);
+    Map<String, ImmutableList<IPrediction>> getPredictionsByStop(TransitCache transitCache, IDownloader downloader, ExecutorService executorService, DatabaseProvider provider, List<Stop> stops) throws Exception;
 
     Collection<Integer> getSourceIds();
 

@@ -31,36 +31,27 @@ public class NextbusPredictionsRequester {
         this.provider = provider;
     }
 
-    public ListenableFuture<Map<String, PredictionForStop>> getPredictionsByStop(final NextbusTransitSource source, final List<Stop> toRead) {
-        ListenableFutureTask<Map<String, PredictionForStop>> task =  ListenableFutureTask.create(new Callable<Map<String, PredictionForStop>>() {
-            @Override
-            public Map<String, PredictionForStop> call() throws Exception {
-                StringBuilder urlString = new StringBuilder("http://webservices.nextbus.com/service/publicXMLFeed?command=predictionsForMultiStops&a=" + agency);
+    public Map<String, PredictionForStop> getPredictionsByStop(final NextbusTransitSource source, final List<Stop> toRead) throws Exception {
+        StringBuilder urlString = new StringBuilder("http://webservices.nextbus.com/service/publicXMLFeed?command=predictionsForMultiStops&a=" + agency);
 
-                ImmutableTable<String, Integer, Route> routes = transitCache.readRoutesBySourceId(provider, source.getSourceIds()).get();
+        ImmutableTable<String, Integer, Route> routes = transitCache.readRoutesBySourceId(provider, source.getSourceIds());
 
-                for (Stop stop : toRead) {
-                    for (String routeId : stop.getRouteIds()) {
-                        if (routes.containsRow(routeId)) {
-                            urlString.append("&stops=").append(routeId).append("%7C");
-                            urlString.append("%7C").append(stop.getStopId());
-                        }
-                    }
+        for (Stop stop : toRead) {
+            for (String routeId : stop.getRouteIds()) {
+                if (routes.containsRow(routeId)) {
+                    urlString.append("&stops=").append(routeId).append("%7C");
+                    urlString.append("%7C").append(stop.getStopId());
                 }
-
-                System.out.println(urlString);
-
-                InputStream stream = downloader.download(urlString.toString());
-
-                NextbusPredictionsFeedParser parser = new NextbusPredictionsFeedParser();
-                parser.runParse(stream);
-
-                return parser.getPredictions();
             }
-        });
-        executorService.submit(task);
+        }
 
+        System.out.println(urlString);
 
-        return task;
+        InputStream stream = downloader.download(urlString.toString());
+
+        NextbusPredictionsFeedParser parser = new NextbusPredictionsFeedParser();
+        parser.runParse(stream);
+
+        return parser.getPredictions();
     }
 }

@@ -22,29 +22,29 @@ import java.util.concurrent.ExecutorService;
 public class NextbusTransitSource implements ITransitSource {
     public static final int fetchDelay = 13000;
 
-    private final String agency;
+    private final String _agency;
 
     public NextbusTransitSource(String agency) {
-        this.agency = agency;
+        _agency = agency;
     }
 
     @Override
-    public ListenableFuture<List<Stop>> readStops(DatabaseProvider provider, TransitCache transitCache, List<String> toRead) throws Throwable {
+    public List<Stop> readStops(DatabaseProvider provider, TransitCache transitCache, List<String> toRead) throws Exception {
         return transitCache.readStops(provider, toRead);
     }
 
     @Override
-    public ListenableFuture<List<Stop>> getStopsNear(DatabaseProvider provider, TransitCache transitCache, float lat, float lon) throws Throwable {
+    public List<Stop> getStopsNear(DatabaseProvider provider, TransitCache transitCache, float lat, float lon) throws Exception {
         return transitCache.readStopsNear(provider, lat, lon);
     }
 
     @Override
-    public ListenableFuture<ImmutableTable<String, Integer, Route>> getRoutes(DatabaseProvider provider, TransitCache transitCache) throws Throwable {
+    public ImmutableTable<String, Integer, Route> getRoutes(DatabaseProvider provider, TransitCache transitCache) throws Exception {
         return transitCache.readRoutesBySourceId(provider, getSourceIds());
     }
 
     @Override
-    public ListenableFuture<Map<String, ImmutableList<IPrediction>>> getPredictionsByStop(final TransitCache transitCache, IDownloader downloader, ExecutorService executorService, DatabaseProvider provider, List<Stop> stops) {
+    public Map<String, ImmutableList<IPrediction>> getPredictionsByStop(final TransitCache transitCache, IDownloader downloader, ExecutorService executorService, DatabaseProvider provider, List<Stop> stops) throws Exception {
         Map<String, ImmutableList<IPrediction>> cachedPredictionsForStops = transitCache.getCachedPredictionsForStops(stops, fetchDelay);
 
         List<Stop> toRead = Lists.newArrayList();
@@ -55,21 +55,15 @@ public class NextbusTransitSource implements ITransitSource {
             }
         }
 
-        NextbusPredictionsRequester requester = new NextbusPredictionsRequester(agency, downloader, executorService, transitCache, provider);
-        ListenableFuture<Map<String, PredictionForStop>> predictions = requester.getPredictionsByStop(this, toRead);
+        NextbusPredictionsRequester requester = new NextbusPredictionsRequester(_agency, downloader, executorService, transitCache, provider);
+        Map<String, PredictionForStop> predictions = requester.getPredictionsByStop(this, toRead);
 
-        return Futures.transform(predictions, new Function<Map<String,PredictionForStop>, Map<String, ImmutableList<IPrediction>>>() {
-            @Nullable
-            @Override
-            public Map<String, ImmutableList<IPrediction>> apply(Map<String, PredictionForStop> input) {
-                transitCache.updateStops(input);
-                Map<String, ImmutableList<IPrediction>> ret = Maps.newHashMap();
-                for (Map.Entry<String, PredictionForStop> entry : input.entrySet()) {
-                    ret.put(entry.getKey(), entry.getValue().getPredictionList());
-                }
-                return ret;
-            }
-        });
+        transitCache.updateStops(predictions);
+        Map<String, ImmutableList<IPrediction>> ret = Maps.newHashMap();
+        for (Map.Entry<String, PredictionForStop> entry : predictions.entrySet()) {
+            ret.put(entry.getKey(), entry.getValue().getPredictionList());
+        }
+        return ret;
     }
 
 

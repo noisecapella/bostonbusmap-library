@@ -17,82 +17,60 @@ import java.util.concurrent.*;
  * Created by george on 3/1/15.
  */
 public class TransitCache {
-    private final ConcurrentMap<String, Stop> stops = Maps.newConcurrentMap();
-    private final ConcurrentMap<String, PredictionForStop> predictions = Maps.newConcurrentMap();
-    private ImmutableTable<String, Integer, Route> routes = ImmutableTable.of();
+    private final ConcurrentMap<String, Stop> _stops = Maps.newConcurrentMap();
+    private final ConcurrentMap<String, PredictionForStop> _predictions = Maps.newConcurrentMap();
+    private ImmutableTable<String, Integer, Route> _routes = ImmutableTable.of();
 
-    public ListenableFuture<List<Stop>> readStops(DatabaseProvider provider, List<String> stopIds) throws Throwable {
+    public List<Stop> readStops(DatabaseProvider provider, List<String> stopIds) throws Exception {
         final List<Stop> ret = Lists.newArrayList();
 
         List<String> toRead = Lists.newArrayList();
         for (String stopId : stopIds) {
-            Stop stop = stops.get(stopId);
+            Stop stop = _stops.get(stopId);
             if (stop != null) {
                 ret.add(stop);
-            }
-            else {
+            } else {
                 toRead.add(stopId);
             }
         }
 
-        ListenableFuture<List<Stop>> read = provider.readStops(toRead);
-        return Futures.transform(read, new Function<List<Stop>, List<Stop>>() {
-            @Nullable
-            @Override
-            public List<Stop> apply(List<Stop> input) {
-                for (Stop stop : input) {
-                    stops.put(stop.getStopId(), stop);
-                    ret.add(stop);
-                }
+        List<Stop> read = provider.readStops(toRead);
 
-                return ret;
-            }
-        });
+        for (Stop stop : read) {
+            _stops.put(stop.getStopId(), stop);
+            ret.add(stop);
+        }
+
+        return ret;
     }
 
-    public ListenableFuture<List<Stop>> readStopsNear(DatabaseProvider provider, float lat, float lon) throws Throwable {
-        List<String> stopIds = provider.getStopIdsNear(lat, lon).get();
+    public List<Stop> readStopsNear(DatabaseProvider provider, float lat, float lon) throws Exception {
+        List<String> stopIds = provider.getStopIdsNear(lat, lon);
 
         return readStops(provider, stopIds);
     }
 
-    private static <T> ListenableFutureTask<T> createTask(final T t) {
-        ListenableFutureTask<T> task = ListenableFutureTask.create(new Callable<T>() {
-            @Override
-            public T call() throws Exception {
-                return t;
-            }
-        });
-        MoreExecutors.directExecutor().execute(task);
-        return task;
-    }
-
-    public ListenableFuture<ImmutableTable<String, Integer, Route>> readRoutesBySourceId(DatabaseProvider provider, List<Integer> sourceIds) throws Exception {
-        if (routes.size() > 0) {
-            return createTask(routes);
+    public ImmutableTable<String, Integer, Route> readRoutesBySourceId(DatabaseProvider provider, List<Integer> sourceIds) throws Exception {
+        if (_routes.size() > 0) {
+            return _routes;
         }
 
-        return Futures.transform(provider.getRoutesBySourceId(sourceIds), new Function<List<Route>, ImmutableTable<String, Integer, Route>>() {
-            @Nullable
-            @Override
-            public ImmutableTable<String, Integer, Route> apply(List<Route> input) {
-                ImmutableTable.Builder<String, Integer, Route> builder = ImmutableTable.builder();
-                for (Route route : input) {
-                    builder.put(route.getRoute(), route.getSourceId(), route);
-                }
+        List<Route> routes = provider.getRoutesBySourceId(sourceIds);
+        ImmutableTable.Builder<String, Integer, Route> builder = ImmutableTable.builder();
+        for (Route route : routes) {
+            builder.put(route.getRoute(), route.getSourceId(), route);
+        }
 
-                routes = builder.build();
-                return routes;
-            }
-        });
+        _routes = builder.build();
+        return _routes;
     }
 
-    public Map<String, ImmutableList<IPrediction>> getCachedPredictionsForStops(List<Stop> stopIds, long fetchDelay) {
+    public Map<String, ImmutableList<IPrediction>> getCachedPredictionsForStops(List<Stop> stopIds, long fetchDelay) throws Exception {
         Map<String, ImmutableList<IPrediction>> ret = Maps.newHashMap();
 
         long currentMillis = System.currentTimeMillis();
         for (Stop stop : stopIds) {
-            PredictionForStop predictionForStop = predictions.get(stop.getStopId());
+            PredictionForStop predictionForStop = _predictions.get(stop.getStopId());
             if (predictionForStop != null && predictionForStop.getLastUpdate() + fetchDelay >= currentMillis) {
                 ret.put(stop.getStopId(), predictionForStop.getPredictionList());
             }
@@ -101,12 +79,12 @@ public class TransitCache {
         return ret;
     }
 
-    public void updateStops(Map<String, PredictionForStop> stops) {
+    public void updateStops(Map<String, PredictionForStop> stops) throws Exception {
         for (Map.Entry<String, PredictionForStop> entry : stops.entrySet()) {
             PredictionForStop predictionsForStop = entry.getValue();
             String stopId = entry.getKey();
 
-            predictions.put(stopId, predictionsForStop);
+            _predictions.put(stopId, predictionsForStop);
         }
     }
 }

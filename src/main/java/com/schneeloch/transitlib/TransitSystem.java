@@ -44,44 +44,23 @@ public class TransitSystem {
     }
 
 
-    public ListenableFuture<Iterable<Stop>> getStopsNear(float lat, float lon) throws Throwable {
-        List<ListenableFuture<List<Stop>>> ret = Lists.newArrayList();
+    public Iterable<Stop> getStopsNear(float lat, float lon) throws Throwable {
+        List<Stop> ret = Lists.newArrayList();
         for (ITransitSource source : sources) {
-            ret.add(source.getStopsNear(provider, transitCache, lat, lon));
+            ret.addAll(source.getStopsNear(provider, transitCache, lat, lon));
         }
 
-        ListenableFuture<List<List<Stop>>> list = Futures.allAsList(ret);
-        return Futures.transform(list, new Function<List<List<Stop>>, Iterable<Stop>>() {
-            @Nullable
-            @Override
-            public Iterable<Stop> apply(List<List<Stop>> input) {
-                return Iterables.concat(input);
-            }
-        });
+        return ret;
     }
 
-    public ListenableFuture<Map<String, ImmutableList<IPrediction>>> getPredictionsByStop(List<Stop> stops) {
-        List<ListenableFuture<Map<String, ImmutableList<IPrediction>>>> ret = Lists.newArrayList();
+    public Map<String, ImmutableList<IPrediction>> getPredictionsByStop(List<Stop> stops) throws Exception {
+        Map<String, ImmutableList<IPrediction>> ret = Maps.newHashMap();
         for (ITransitSource source : sources) {
-            ret.add(source.getPredictionsByStop(transitCache, downloader, service, provider, stops));
+            Map<String, ImmutableList<IPrediction>> map = source.getPredictionsByStop(transitCache, downloader, service, provider, stops);
+            ret.putAll(map);
         }
 
-        ListenableFuture<List<Map<String, ImmutableList<IPrediction>>>> list = Futures.allAsList(ret);
-        return Futures.transform(list, new Function<List<Map<String, ImmutableList<IPrediction>>>, Map<String, ImmutableList<IPrediction>>>() {
-            @Nullable
-            @Override
-            public Map<String, ImmutableList<IPrediction>> apply(List<Map<String, ImmutableList<IPrediction>>> input) {
-                Map<String, ImmutableList<IPrediction>> ret = Maps.newHashMap();
-
-                for (Map<String, ImmutableList<IPrediction>> map : input) {
-                    for (Map.Entry<String, ImmutableList<IPrediction>> entry : map.entrySet()) {
-                        ret.put(entry.getKey(), entry.getValue());
-                    }
-                }
-
-                return ret;
-            }
-        });
+        return ret;
     }
 
     public void stop() throws InterruptedException {
