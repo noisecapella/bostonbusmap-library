@@ -1,70 +1,65 @@
 package com.schneeloch.transitlib;
 
 import com.google.common.base.Function;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
+import com.google.common.collect.*;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.schneeloch.outside.DatabaseProvider;
+import com.schneeloch.schema.Schema;
 
 import javax.annotation.Nullable;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
 /**
  * Created by george on 3/1/15.
  */
 public class TransitSystem {
-    private final DatabaseProvider provider;
-    private final ExecutorService service;
-    private final ImmutableList<ITransitSource> sources;
-    private final TransitCache transitCache;
-    private final IDownloader downloader;
+    private final ImmutableList<ITransitSource> _sources;
+    private final ImmutableMap<Schema.Routes.SourceId, ITransitSource> _sourceLookup;
+    private final TransitCache _transitCache;
 
-    public TransitSystem(ExecutorService service, DatabaseProvider provider, ImmutableList<ITransitSource> sources, TransitCache transitCache, IDownloader downloader) {
-        this.sources = sources;
-        this.transitCache = transitCache;
-        this.provider = provider;
-        this.service = service;
-        this.downloader = downloader;
-    }
+    public TransitSystem(ImmutableList<ITransitSource> sources, TransitCache transitCache) {
+        this._sources = sources;
+        this._transitCache = transitCache;
 
-    public ITransitSource getTransitSource(int sourceId) {
+        ImmutableMap.Builder<Schema.Routes.SourceId, ITransitSource> builder = ImmutableMap.builder();
         for (ITransitSource source : sources) {
-            for (int transitSourceId : source.getSourceIds()) {
-                if (transitSourceId == sourceId) {
-                    return source;
-                }
+            for (Schema.Routes.SourceId sourceId : source.getSourceIds()) {
+                builder.put(sourceId, source);
             }
         }
-        throw new RuntimeException("Unable to find transit source for id " + sourceId);
+        _sourceLookup = builder.build();
     }
 
-
-    public Iterable<Stop> getStopsNear(float lat, float lon) throws Throwable {
+    public Iterable<Stop> getStopsNear(Providers providers, float lat, float lon) throws Throwable {
         List<Stop> ret = Lists.newArrayList();
-        for (ITransitSource source : sources) {
-            ret.addAll(source.getStopsNear(provider, transitCache, lat, lon));
+        for (ITransitSource source : _sources) {
+            ret.addAll(source.getStopsNear(providers, _transitCache, lat, lon));
         }
 
         return ret;
     }
 
-    public Map<String, ImmutableList<IPrediction>> getPredictionsByStop(List<Stop> stops) throws Exception {
+    public Map<String, ImmutableList<IPrediction>> getPredictionsByStop(Providers providers, TransitCache transitCache, List<Stop> stops) throws Exception {
         Map<String, ImmutableList<IPrediction>> ret = Maps.newHashMap();
-        for (ITransitSource source : sources) {
-            Map<String, ImmutableList<IPrediction>> map = source.getPredictionsByStop(transitCache, downloader, service, provider, stops);
+        for (ITransitSource source : _sources) {
+            Map<String, ImmutableList<IPrediction>> map = source.getPredictionsByStop(providers, transitCache, stops);
             ret.putAll(map);
         }
 
         return ret;
     }
 
-    public void stop() throws InterruptedException {
-        service.shutdown();
-        provider.stop();
+    public ImmutableTable<String, Integer, Route> getRoutesByTransitSources(Providers providers, TransitCache transitCache, List<Schema.Routes.SourceId> sourceIds) throws Exception {
+        ImmutableTable.Builder<String, Integer, Route> builder = ImmutableTable.builder();
+        for (Schema.Routes.SourceId sourceId : sourceIds) {
+            ITransitSource source = _sourceLookup.get(sourceId);
+            builder.putAll(source.getRoutesBySourceId(providers, transitCache, sourceId));
+        }
+        return builder.build();
     }
 }

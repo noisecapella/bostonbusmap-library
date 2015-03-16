@@ -20,6 +20,7 @@ public class Main {
 
         DatabaseProvider databaseProvider = new DatabaseProvider();
         TransitSystem transitSystem = null;
+        Providers providers = null;
         try {
             ITransitSource mbta = new NextbusTransitSource("mbta");
 
@@ -28,20 +29,22 @@ public class Main {
             TransitCache transitCache = new TransitCache();
             ExecutorService service = Executors.newCachedThreadPool();
             Downloader downloader = new Downloader();
-            transitSystem = new TransitSystem(service, databaseProvider, sources, transitCache, downloader);
-            List<Stop> nearbyStops = Lists.newArrayList(transitSystem.getStopsNear(42.3601f, -71.0589f));
+            providers = new Providers(service, databaseProvider, downloader);
+
+            transitSystem = new TransitSystem(sources, transitCache);
+            List<Stop> nearbyStops = Lists.newArrayList(transitSystem.getStopsNear(providers, 42.3601f, -71.0589f));
 
             for (Stop stop : nearbyStops) {
                 // System.out.println(stop.toString());
                 System.out.println(stop.getTitle());
             }
 
-            ImmutableTable<String, Integer, Route> routes = transitSystem.getTransitSource(Schema.Routes.enumagencyidBus).getRoutes(databaseProvider, transitCache);
+            ImmutableTable<String, Integer, Route> routes = transitSystem.getRoutesByTransitSources(providers, transitCache, Lists.newArrayList(Schema.Routes.SourceId.Bus));
             for (Table.Cell<String, Integer, Route> route : routes.cellSet()) {
                 System.out.println(route.getValue().getRouteTitle());
             }
 
-            Map<String, ImmutableList<IPrediction>> entries = transitSystem.getPredictionsByStop(nearbyStops);
+            Map<String, ImmutableList<IPrediction>> entries = transitSystem.getPredictionsByStop(providers, transitCache, nearbyStops);
             for (Map.Entry<String, ImmutableList<IPrediction>> entry : entries.entrySet()) {
                 System.out.println(entry.getKey());
                 for (IPrediction prediction : entry.getValue()) {
@@ -54,10 +57,10 @@ public class Main {
         }
         finally {
             try {
-                if (transitSystem != null) {
-                    transitSystem.stop();
+                if (providers != null) {
+                    providers.stop();
                 }
-            } catch (InterruptedException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }

@@ -18,23 +18,21 @@ import java.util.concurrent.*;
  */
 public class NextbusPredictionsRequester {
     private final String agency;
-    private final IDownloader downloader;
-    private final ExecutorService executorService;
+    private final Providers providers;
     private final TransitCache transitCache;
-    private final DatabaseProvider provider;
+    private final NextbusTransitSource source;
 
-    public NextbusPredictionsRequester(String agency, IDownloader downloader, ExecutorService executorService, TransitCache transitCache, DatabaseProvider provider) {
+    public NextbusPredictionsRequester(Providers providers, TransitCache transitCache, NextbusTransitSource source, String agency) {
         this.agency = agency;
-        this.downloader = downloader;
-        this.executorService = executorService;
         this.transitCache = transitCache;
-        this.provider = provider;
+        this.providers = providers;
+        this.source = source;
     }
 
-    public Map<String, PredictionForStop> getPredictionsByStop(final NextbusTransitSource source, final List<Stop> toRead) throws Exception {
+    public Map<String, PredictionForStop> getPredictionsByStop(final List<Stop> toRead) throws Exception {
         StringBuilder urlString = new StringBuilder("http://webservices.nextbus.com/service/publicXMLFeed?command=predictionsForMultiStops&a=" + agency);
 
-        ImmutableTable<String, Integer, Route> routes = transitCache.readRoutesBySourceId(provider, source.getSourceIds());
+        ImmutableTable<String, Integer, Route> routes = transitCache.readRoutesBySourceId(providers, source.getSourceIds());
 
         for (Stop stop : toRead) {
             for (String routeId : stop.getRouteIds()) {
@@ -45,8 +43,7 @@ public class NextbusPredictionsRequester {
             }
         }
 
-        System.out.println(urlString);
-
+        IDownloader downloader = providers.getDownloader();
         InputStream stream = downloader.download(urlString.toString());
 
         NextbusPredictionsFeedParser parser = new NextbusPredictionsFeedParser();

@@ -5,6 +5,7 @@ import com.google.common.base.Function;
 import com.google.common.collect.*;
 import com.google.common.util.concurrent.*;
 import com.schneeloch.outside.DatabaseProvider;
+import com.schneeloch.schema.Schema;
 
 import javax.annotation.Nullable;
 import java.util.Collection;
@@ -21,7 +22,7 @@ public class TransitCache {
     private final ConcurrentMap<String, PredictionForStop> _predictions = Maps.newConcurrentMap();
     private ImmutableTable<String, Integer, Route> _routes = ImmutableTable.of();
 
-    public List<Stop> readStops(DatabaseProvider provider, List<String> stopIds) throws Exception {
+    public List<Stop> readStops(Providers providers, List<String> stopIds) throws Exception {
         final List<Stop> ret = Lists.newArrayList();
 
         List<String> toRead = Lists.newArrayList();
@@ -34,7 +35,8 @@ public class TransitCache {
             }
         }
 
-        List<Stop> read = provider.readStops(toRead);
+        IDatabaseProvider databaseProvider = providers.getDatabaseProvider();
+        List<Stop> read = databaseProvider.readStops(toRead);
 
         for (Stop stop : read) {
             _stops.put(stop.getStopId(), stop);
@@ -44,17 +46,19 @@ public class TransitCache {
         return ret;
     }
 
-    public List<Stop> readStopsNear(DatabaseProvider provider, float lat, float lon) throws Exception {
-        List<String> stopIds = provider.getStopIdsNear(lat, lon);
+    public List<Stop> readStopsNear(Providers providers, float lat, float lon) throws Exception {
+        IDatabaseProvider databaseProvider = providers.getDatabaseProvider();
+        List<String> stopIds = databaseProvider.getStopIdsNear(lat, lon);
 
-        return readStops(provider, stopIds);
+        return readStops(providers, stopIds);
     }
 
-    public ImmutableTable<String, Integer, Route> readRoutesBySourceId(DatabaseProvider provider, List<Integer> sourceIds) throws Exception {
+    public ImmutableTable<String, Integer, Route> readRoutesBySourceId(Providers providers, List<Schema.Routes.SourceId> sourceIds) throws Exception {
         if (_routes.size() > 0) {
             return _routes;
         }
 
+        IDatabaseProvider provider = providers.getDatabaseProvider();
         List<Route> routes = provider.getRoutesBySourceId(sourceIds);
         ImmutableTable.Builder<String, Integer, Route> builder = ImmutableTable.builder();
         for (Route route : routes) {
@@ -87,4 +91,5 @@ public class TransitCache {
             _predictions.put(stopId, predictionsForStop);
         }
     }
+
 }

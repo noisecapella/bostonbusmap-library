@@ -12,6 +12,7 @@ import com.schneeloch.schema.Schema;
 import com.schneeloch.transitlib.parser.NextbusPredictionsRequester;
 
 import javax.annotation.Nullable;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -29,22 +30,22 @@ public class NextbusTransitSource implements ITransitSource {
     }
 
     @Override
-    public List<Stop> readStops(DatabaseProvider provider, TransitCache transitCache, List<String> toRead) throws Exception {
-        return transitCache.readStops(provider, toRead);
+    public List<Stop> readStops(Providers providers, TransitCache transitCache, List<String> toRead) throws Exception {
+        return transitCache.readStops(providers, toRead);
     }
 
     @Override
-    public List<Stop> getStopsNear(DatabaseProvider provider, TransitCache transitCache, float lat, float lon) throws Exception {
-        return transitCache.readStopsNear(provider, lat, lon);
+    public List<Stop> getStopsNear(Providers providers, TransitCache transitCache, float lat, float lon) throws Exception {
+        return transitCache.readStopsNear(providers, lat, lon);
     }
 
     @Override
-    public ImmutableTable<String, Integer, Route> getRoutes(DatabaseProvider provider, TransitCache transitCache) throws Exception {
-        return transitCache.readRoutesBySourceId(provider, getSourceIds());
+    public ImmutableTable<String, Integer, Route> getRoutesBySourceId(Providers providers, TransitCache transitCache, Schema.Routes.SourceId sourceId) throws Exception {
+        return transitCache.readRoutesBySourceId(providers, Lists.newArrayList(sourceId));
     }
 
     @Override
-    public Map<String, ImmutableList<IPrediction>> getPredictionsByStop(final TransitCache transitCache, IDownloader downloader, ExecutorService executorService, DatabaseProvider provider, List<Stop> stops) throws Exception {
+    public Map<String, ImmutableList<IPrediction>> getPredictionsByStop(Providers providers, final TransitCache transitCache, List<Stop> stops) throws Exception {
         Map<String, ImmutableList<IPrediction>> cachedPredictionsForStops = transitCache.getCachedPredictionsForStops(stops, fetchDelay);
 
         List<Stop> toRead = Lists.newArrayList();
@@ -55,8 +56,8 @@ public class NextbusTransitSource implements ITransitSource {
             }
         }
 
-        NextbusPredictionsRequester requester = new NextbusPredictionsRequester(_agency, downloader, executorService, transitCache, provider);
-        Map<String, PredictionForStop> predictions = requester.getPredictionsByStop(this, toRead);
+        NextbusPredictionsRequester requester = new NextbusPredictionsRequester(providers, transitCache, this, _agency);
+        Map<String, PredictionForStop> predictions = requester.getPredictionsByStop(toRead);
 
         transitCache.updateStops(predictions);
         Map<String, ImmutableList<IPrediction>> ret = Maps.newHashMap();
@@ -69,8 +70,8 @@ public class NextbusTransitSource implements ITransitSource {
 
 
     @Override
-    public List<Integer> getSourceIds() {
-        return Lists.newArrayList(Schema.Routes.enumagencyidBus);
+    public List<Schema.Routes.SourceId> getSourceIds() {
+        return Lists.newArrayList(Schema.Routes.SourceId.Bus);
     }
 
 }

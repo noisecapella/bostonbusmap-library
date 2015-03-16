@@ -4,6 +4,7 @@ import com.almworks.sqlite4java.*;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.schneeloch.schema.Schema;
 import com.schneeloch.transitlib.Geometry;
 import com.schneeloch.transitlib.IDatabaseProvider;
 import com.schneeloch.transitlib.Route;
@@ -103,7 +104,7 @@ public class DatabaseProvider implements IDatabaseProvider {
     }
 
     @Override
-    public List<Route> getRoutesBySourceId(final Collection<Integer> sourceIds) throws Exception {
+    public List<Route> getRoutesBySourceId(final List<Schema.Routes.SourceId> sourceIds) throws Exception {
         String[] questionMarks = new String[sourceIds.size()];
         for (int i = 0; i < questionMarks.length; i++) {
             questionMarks[i] = "?";
@@ -118,8 +119,8 @@ public class DatabaseProvider implements IDatabaseProvider {
             protected List<Route> job(SQLiteConnection connection) throws Throwable {
                 SQLiteStatement statement = connection.prepare(sql);
                 int i = 0;
-                for (int sourceId : sourceIds) {
-                    statement.bind(i+1, sourceId);
+                for (Schema.Routes.SourceId sourceId : sourceIds) {
+                    statement.bind(i+1, sourceId.getValue());
                     i++;
                 }
                 try {
